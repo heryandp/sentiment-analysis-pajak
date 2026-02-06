@@ -68,7 +68,9 @@ def _load_assets() -> None:
         labels = df[EVAL_LABEL_COL].fillna("").astype(str).tolist()
         X_eval = VECTORIZER.transform(texts)
         preds = MODEL.predict(X_eval)
-        EVAL_REPORT = classification_report(labels, preds, output_dict=True)
+        EVAL_REPORT = classification_report(
+            labels, preds, output_dict=True, zero_division=0
+        )
     except Exception:
         EVAL_REPORT = None
 
@@ -255,8 +257,9 @@ INDEX_HTML = """
     </header>
 
     <div class="card">
-      <textarea id="text" placeholder="Masukkan teks di sini... (bisa multi-baris)"></textarea>
+      <div id="inputs"></div>
       <div class="row">
+        <button id="addInput" type="button">Add Input</button>
         <button id="run">Analyze</button>
         <button id="sample" type="button">Sample</button>
         <button id="sampleMulti" type="button">Sample Multi</button>
@@ -275,29 +278,53 @@ INDEX_HTML = """
 const runBtn = document.getElementById('run');
 const sampleBtn = document.getElementById('sample');
 const sampleMultiBtn = document.getElementById('sampleMulti');
+const addInputBtn = document.getElementById('addInput');
 const resultBox = document.getElementById('result');
 const sentimentEl = document.getElementById('sentiment');
 const debugEl = document.getElementById('debug');
-const textEl = document.getElementById('text');
+const inputsEl = document.getElementById('inputs');
+
+function addInput(value = "") {
+  const wrap = document.createElement('div');
+  wrap.style.marginTop = '8px';
+  const ta = document.createElement('textarea');
+  ta.placeholder = "Masukkan teks di sini...";
+  ta.value = value;
+  ta.style.minHeight = '120px';
+  ta.style.width = '100%';
+  const remove = document.createElement('button');
+  remove.type = 'button';
+  remove.textContent = 'Remove';
+  remove.style.marginTop = '6px';
+  remove.onclick = () => wrap.remove();
+  wrap.appendChild(ta);
+  wrap.appendChild(remove);
+  inputsEl.appendChild(wrap);
+}
+
+addInput();
 
 sampleBtn.onclick = () => {
-  textEl.value = "Kebijakan pajak baru ini sangat membantu UMKM berkembang.";
+  inputsEl.innerHTML = '';
+  addInput("Kebijakan pajak baru ini sangat membantu UMKM berkembang.");
 };
 sampleMultiBtn.onclick = () => {
-  textEl.value = [
-    "Kebijakan pajak baru ini sangat membantu UMKM berkembang.",
-    "Layanan pajak online masih sering bermasalah dan membuat frustrasi.",
-    "Informasi tentang aturan pajak perlu disosialisasikan lebih jelas."
-  ].join("\\n");
+  inputsEl.innerHTML = '';
+  addInput("Kebijakan pajak baru ini sangat membantu UMKM berkembang.");
+  addInput("Layanan pajak online masih sering bermasalah dan membuat frustrasi.");
+  addInput("Informasi tentang aturan pajak perlu disosialisasikan lebih jelas.");
 };
 
+addInputBtn.onclick = () => addInput();
+
 runBtn.onclick = async () => {
-  const text = textEl.value.trim();
-  if (!text) return;
+  const values = Array.from(inputsEl.querySelectorAll('textarea'))
+    .map(t => t.value.trim())
+    .filter(Boolean);
+  if (values.length === 0) return;
   runBtn.disabled = true;
   try {
-    const lines = text.split("\\n").map(s => s.trim()).filter(Boolean);
-    const body = lines.length > 1 ? { texts: lines } : { text };
+    const body = values.length > 1 ? { texts: values } : { text: values[0] };
     const res = await fetch('/api/predict', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
