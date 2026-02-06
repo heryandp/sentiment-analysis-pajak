@@ -2,6 +2,8 @@
 
 End-to-end experiments for Indonesian tax sentiment analysis using Google News data, YouTube comments, classic ML models, and an LLM-assisted labeling pipeline. The project is organized around Jupyter notebooks that implement each stage of the workflow.
 
+![Demo](images/image.png)
+
 ## Project Flow (High Level)
 1. **Collect news** from Google News via Serper API, clean dates, deduplicate, and extract full content.
 2. **Convert content** JSON into a single CSV for modeling.
