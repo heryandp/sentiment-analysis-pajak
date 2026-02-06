@@ -112,6 +112,52 @@ def _predict(text: str) -> Dict[str, Any]:
     }
 
 
+def _predict_many(texts: list[str]) -> Dict[str, Any]:
+    cleaned_list = [_basic_preprocess(t) for t in texts]
+    X = VECTORIZER.transform(cleaned_list)
+    preds = MODEL.predict(X)
+
+    debug: Dict[str, Any] = {
+        "count": len(texts),
+        "vector_shape": list(X.shape),
+        "model_class": MODEL.__class__.__name__,
+        "vectorizer_class": VECTORIZER.__class__.__name__,
+    }
+
+    results = []
+    for raw, cleaned, pred in zip(texts, cleaned_list, preds):
+        item = {
+            "text": raw,
+            "sentiment": str(pred),
+            "debug": {
+                "input_length": len(raw),
+                "cleaned_length": len(cleaned),
+            },
+        }
+        results.append(item)
+
+    if hasattr(MODEL, "predict_proba"):
+        probs = MODEL.predict_proba(X)
+        classes = list(getattr(MODEL, "classes_", []))
+        for item, row in zip(results, probs):
+            item["debug"]["probabilities"] = {
+                str(c): float(p) for c, p in zip(classes, row)
+            }
+    elif hasattr(MODEL, "decision_function"):
+        scores = MODEL.decision_function(X)
+        try:
+            scores = scores.tolist()
+        except Exception:
+            pass
+        for item, row in zip(results, scores):
+            item["debug"]["decision_scores"] = row
+
+    return {
+        "results": results,
+        "debug": debug,
+    }
+
+
 INDEX_HTML = """
 <!doctype html>
 <html lang="en">
@@ -209,10 +255,11 @@ INDEX_HTML = """
     </header>
 
     <div class="card">
-      <textarea id="text" placeholder="Masukkan teks di sini..."></textarea>
+      <textarea id="text" placeholder="Masukkan teks di sini... (bisa multi-baris)"></textarea>
       <div class="row">
         <button id="run">Analyze</button>
         <button id="sample" type="button">Sample</button>
+        <button id="sampleMulti" type="button">Sample Multi</button>
       </div>
       <div class="result" id="result" style="display:none;">
         <div>Sentiment: <span class="badge" id="sentiment"></span></div>
@@ -227,6 +274,7 @@ INDEX_HTML = """
 <script>
 const runBtn = document.getElementById('run');
 const sampleBtn = document.getElementById('sample');
+const sampleMultiBtn = document.getElementById('sampleMulti');
 const resultBox = document.getElementById('result');
 const sentimentEl = document.getElementById('sentiment');
 const debugEl = document.getElementById('debug');
@@ -235,21 +283,35 @@ const textEl = document.getElementById('text');
 sampleBtn.onclick = () => {
   textEl.value = "Kebijakan pajak baru ini sangat membantu UMKM berkembang.";
 };
+sampleMultiBtn.onclick = () => {
+  textEl.value = [
+    "Kebijakan pajak baru ini sangat membantu UMKM berkembang.",
+    "Layanan pajak online masih sering bermasalah dan membuat frustrasi.",
+    "Informasi tentang aturan pajak perlu disosialisasikan lebih jelas."
+  ].join("\\n");
+};
 
 runBtn.onclick = async () => {
   const text = textEl.value.trim();
   if (!text) return;
   runBtn.disabled = true;
   try {
+    const lines = text.split("\\n").map(s => s.trim()).filter(Boolean);
+    const body = lines.length > 1 ? { texts: lines } : { text };
     const res = await fetch('/api/predict', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({text})
+      body: JSON.stringify(body)
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Request failed');
-    sentimentEl.textContent = data.sentiment;
-    debugEl.textContent = JSON.stringify(data.debug, null, 2);
+    if (data.results) {
+      sentimentEl.textContent = data.results.map(r => r.sentiment).join(", ");
+      debugEl.textContent = JSON.stringify(data, null, 2);
+    } else {
+      sentimentEl.textContent = data.sentiment;
+      debugEl.textContent = JSON.stringify(data.debug, null, 2);
+    }
     resultBox.style.display = 'grid';
   } catch (err) {
     alert(err.message || String(err));
@@ -287,7 +349,23 @@ def predict() -> Any:
     if not request.is_json:
         return jsonify({"error": "Expected JSON body"}), 400
     payload = request.get_json(force=True) or {}
-    text = str(payload.get("text", ""))
+    text = payload.get("text", "")
+    texts = payload.get("texts", None)
+    if texts is not None:
+        if not isinstance(texts, list) or not texts:
+            return jsonify({"error": "`texts` must be a non-empty list"}), 400
+        normalized = [str(t) for t in texts if str(t).strip()]
+        if not normalized:
+            return jsonify({"error": "All texts are empty"}), 400
+        try:
+            result = _predict_many(normalized)
+            if EVAL_REPORT is not None:
+                result["debug"]["evaluation_report"] = EVAL_REPORT
+            return jsonify(result)
+        except Exception as exc:
+            return jsonify({"error": str(exc)}), 500
+
+    text = str(text)
     if not text.strip():
         return jsonify({"error": "Text is required"}), 400
     try:
