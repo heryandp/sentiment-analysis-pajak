@@ -112,10 +112,10 @@ pip install -r requirements.txt
 5. `sentimen_yt.ipynb`
 
 ## Environment Variables
-- `API_KEY`: Serper API key used in `collect.ipynb` for News + Scrape endpoints
+- `API_KEY`: Serper API key used in `collect.ipynb` for News + Scrape endpoints (set in `.env` or environment).
 
 ## Notes & Warnings
-- `collect.ipynb` contains a hardcoded API key in one cell. Remove or replace it with an environment variable before sharing the notebook.
+- `collect.ipynb` reads the API key from environment variable `API_KEY`.
 - Large datasets/models are excluded from git; recreate them by running the notebooks.
 - Notebooks are the main source of truth for the workflow.
 
