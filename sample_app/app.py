@@ -68,6 +68,10 @@ def _predict(text: str) -> Dict[str, Any]:
         probs = MODEL.predict_proba(X)[0]
         classes = list(getattr(MODEL, "classes_", []))
         debug["probabilities"] = {str(c): float(p) for c, p in zip(classes, probs)}
+        if len(probs) == len(classes) and len(classes) > 0:
+            best_idx = int(probs.argmax())
+            debug["confidence"] = float(probs[best_idx])
+            debug["confidence_label"] = str(classes[best_idx])
     elif hasattr(MODEL, "decision_function"):
         scores = MODEL.decision_function(X)
         try:
@@ -75,6 +79,16 @@ def _predict(text: str) -> Dict[str, Any]:
         except Exception:
             pass
         debug["decision_scores"] = scores.tolist() if hasattr(scores, "tolist") else scores
+        try:
+            # Best-effort confidence from decision scores
+            if hasattr(scores, "__len__") and len(scores) > 0:
+                best_idx = int(scores.argmax())  # type: ignore[attr-defined]
+                classes = list(getattr(MODEL, "classes_", []))
+                if len(classes) == len(scores):
+                    debug["confidence"] = float(scores[best_idx])
+                    debug["confidence_label"] = str(classes[best_idx])
+        except Exception:
+            pass
 
     return {
         "sentiment": str(pred),
@@ -114,6 +128,10 @@ def _predict_many(texts: list[str]) -> Dict[str, Any]:
             item["debug"]["probabilities"] = {
                 str(c): float(p) for c, p in zip(classes, row)
             }
+            if len(row) == len(classes) and len(classes) > 0:
+                best_idx = int(row.argmax())
+                item["debug"]["confidence"] = float(row[best_idx])
+                item["debug"]["confidence_label"] = str(classes[best_idx])
     elif hasattr(MODEL, "decision_function"):
         scores = MODEL.decision_function(X)
         try:
@@ -122,6 +140,15 @@ def _predict_many(texts: list[str]) -> Dict[str, Any]:
             pass
         for item, row in zip(results, scores):
             item["debug"]["decision_scores"] = row
+            try:
+                if hasattr(row, "__len__") and len(row) > 0:
+                    best_idx = int(row.index(max(row)))
+                    classes = list(getattr(MODEL, "classes_", []))
+                    if len(classes) == len(row):
+                        item["debug"]["confidence"] = float(row[best_idx])
+                        item["debug"]["confidence_label"] = str(classes[best_idx])
+            except Exception:
+                pass
 
     return {
         "results": results,
@@ -235,6 +262,7 @@ INDEX_HTML = """
       </div>
       <div class="result" id="result" style="display:none;">
         <div>Sentiment: <span class="badge" id="sentiment"></span></div>
+        <div id="list"></div>
         <div>
           <div class="muted">Debug</div>
           <pre id="debug"></pre>
@@ -250,6 +278,7 @@ const sampleMultiBtn = document.getElementById('sampleMulti');
 const addInputBtn = document.getElementById('addInput');
 const resultBox = document.getElementById('result');
 const sentimentEl = document.getElementById('sentiment');
+const listEl = document.getElementById('list');
 const debugEl = document.getElementById('debug');
 const inputsEl = document.getElementById('inputs');
 
@@ -302,10 +331,15 @@ runBtn.onclick = async () => {
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Request failed');
     if (data.results) {
-      sentimentEl.textContent = data.results.map(r => r.sentiment).join(", ");
+      sentimentEl.textContent = "Multiple";
+      listEl.innerHTML = data.results.map((r, i) => {
+        const snip = (r.text || "").slice(0, 120);
+        return `<div><strong>#${i + 1}</strong> <span class="badge">${r.sentiment}</span> <span class="muted">${snip}</span></div>`;
+      }).join("");
       debugEl.textContent = JSON.stringify(data, null, 2);
     } else {
       sentimentEl.textContent = data.sentiment;
+      listEl.innerHTML = "";
       debugEl.textContent = JSON.stringify(data.debug, null, 2);
     }
     resultBox.style.display = 'grid';
