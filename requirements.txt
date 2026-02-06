@@ -1,0 +1,25 @@
+﻿# Core
+pandas
+numpy
+scikit-learn
+matplotlib
+seaborn
+requests
+joblib
+
+# NLP / Transformers
+transformers
+torch
+datasets
+tqdm
+nltk
+Sastrawi
+wordcloud
+
+# Viz / notebooks
+plotly
+IPython
+
+# Data collection
+youtube-comment-downloader
+google-api-python-client
