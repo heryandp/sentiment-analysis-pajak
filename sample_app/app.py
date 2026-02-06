@@ -11,22 +11,49 @@ try:
     import joblib
 except Exception:  # pragma: no cover
     joblib = None  # type: ignore
+try:
+    from transformers import pipeline
+except Exception:  # pragma: no cover
+    pipeline = None  # type: ignore
 
 APP_DIR = Path(__file__).resolve().parent
 ROOT_DIR = APP_DIR.parent
 
 MODEL_PATH = Path(os.environ.get("MODEL_PATH", ROOT_DIR / "sentiment_model_final.pkl"))
 VECTORIZER_PATH = Path(os.environ.get("VECTORIZER_PATH", ROOT_DIR / "tfidf_vectorizer.pkl"))
+TRANSFORMER_PATH = Path(os.environ.get("TRANSFORMER_PATH", ROOT_DIR / "model_pajak_final_fix"))
 
 app = Flask(__name__)
 
 MODEL = None
 VECTORIZER = None
 MODEL_ERROR = None
+PIPELINE = None
 
 
 def _load_assets() -> None:
-    global MODEL, VECTORIZER, MODEL_ERROR
+    global MODEL, VECTORIZER, MODEL_ERROR, PIPELINE
+    MODEL = None
+    VECTORIZER = None
+    PIPELINE = None
+
+    # Prefer transformer model if directory exists
+    if TRANSFORMER_PATH.exists() and (TRANSFORMER_PATH / "config.json").exists():
+        if pipeline is None:
+            MODEL_ERROR = "transformers is not installed. Install dependencies first."
+            return
+        try:
+            PIPELINE = pipeline(
+                "sentiment-analysis",
+                model=str(TRANSFORMER_PATH),
+                tokenizer=str(TRANSFORMER_PATH),
+            )
+            MODEL_ERROR = None
+            return
+        except Exception as exc:  # pragma: no cover
+            MODEL_ERROR = f"Failed to load transformer model: {exc}"
+            return
+
     if joblib is None:
         MODEL_ERROR = "joblib is not installed. Install dependencies first."
         return
@@ -47,6 +74,20 @@ def _basic_preprocess(text: str) -> str:
 
 
 def _predict(text: str) -> Dict[str, Any]:
+    if PIPELINE is not None:
+        result = PIPELINE(text)[0]
+        debug: Dict[str, Any] = {
+            "input": text,
+            "input_length": len(text),
+            "model_class": "transformers.pipeline",
+            "confidence": float(result.get("score", 0.0)),
+            "confidence_label": str(result.get("label", "")),
+        }
+        return {
+            "sentiment": str(result.get("label", "")),
+            "debug": debug,
+        }
+
     if MODEL is None or VECTORIZER is None:
         raise RuntimeError(MODEL_ERROR or "Model not loaded")
 
@@ -97,6 +138,30 @@ def _predict(text: str) -> Dict[str, Any]:
 
 
 def _predict_many(texts: list[str]) -> Dict[str, Any]:
+    if PIPELINE is not None:
+        outputs = PIPELINE(texts)
+        results = []
+        for raw, out in zip(texts, outputs):
+            results.append(
+                {
+                    "text": raw,
+                    "sentiment": str(out.get("label", "")),
+                    "debug": {
+                        "input_length": len(raw),
+                        "confidence": float(out.get("score", 0.0)),
+                        "confidence_label": str(out.get("label", "")),
+                    },
+                }
+            )
+        return {
+            "results": results,
+            "debug": {
+                "inputs": texts,
+                "count": len(texts),
+                "model_class": "transformers.pipeline",
+            },
+        }
+
     cleaned_list = [_basic_preprocess(t) for t in texts]
     X = VECTORIZER.transform(cleaned_list)
     preds = MODEL.predict(X)
@@ -364,9 +429,10 @@ def index() -> str:
 def health() -> Any:
     return jsonify(
         {
-            "ok": MODEL is not None and VECTORIZER is not None,
+            "ok": PIPELINE is not None or (MODEL is not None and VECTORIZER is not None),
             "model_path": str(MODEL_PATH),
             "vectorizer_path": str(VECTORIZER_PATH),
+            "transformer_path": str(TRANSFORMER_PATH),
             "error": MODEL_ERROR,
         }
     )
