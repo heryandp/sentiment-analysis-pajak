@@ -116,7 +116,7 @@ pip install -r requirements.txt
 
 
 ## Sample App (API + UI)
-A simple Flask demo lives in `sample_app/`.
+A simple Flask demo lives in `sample_app/`. It now supports both classic ML (`.pkl`) and Transformer models.
 
 Run it:
 ```bash
@@ -127,11 +127,9 @@ Then open `http://localhost:8000`.
 
 
 Environment (optional):
-- `MODEL_PATH`: path to `sentiment_model_final.pkl`
-- `VECTORIZER_PATH`: path to `tfidf_vectorizer.pkl`
-- `EVAL_DATA_PATH`: CSV for evaluation report (default `testing_manual_results.csv`)
-- `EVAL_TEXT_COL`: text column in eval CSV (default `processed_full_content`)
-- `EVAL_LABEL_COL`: label column in eval CSV (default `label_manual`)
+- `TRANSFORMER_PATH`: folder path to a HuggingFace model (default `model_pajak_final_fix`). If present, the demo uses this.
+- `MODEL_PATH`: path to `sentiment_model_final.pkl` (classic ML fallback)
+- `VECTORIZER_PATH`: path to `tfidf_vectorizer.pkl` (classic ML fallback)
 - `PORT`: server port (default 8000)
 
 ## Notes & Warnings
