@@ -1,0 +1,48 @@
+﻿# Python
+__pycache__/
+*.pyc
+
+# Jupyter
+.ipynb_checkpoints/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Large data/artifacts
+raw/
+raw_content/
+raw_clean_date/
+results_roberta/
+results_roberta_v2/
+model_pajak_final_fix/
+model_sentimen_pajak_v1/
+my_fine_tuned_roberta/
+
+# Model files
+*.safetensors
+*.bin
+*.pt
+*.pth
+*.pkl
+
+# Archives
+*.zip
+
+# Large datasets at repo root
+aggregated_news.json
+aggregated_news copy.json
+combined_data.csv
+combined_data_cleaned.csv
+combined_data_labeled.csv
+combined_data_sentiment.csv
+combined_data_stemmed.csv
+sample_labeled_result.csv
+sentimen_yt_clean.csv
+testing_manual_results.csv
+youtube_data.csv
+youtube_data.json
+youtube_data.html
+yt_cleaned.csv
+yt_cleaned_full_normalized.csv
+yt_cleaned_sentimen.csv

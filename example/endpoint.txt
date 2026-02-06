@@ -1,0 +1,19 @@
+import requests
+import json
+
+url = "https://google.serper.dev/news"
+
+payload = json.dumps({
+  "q": "djp",
+  "gl": "id",
+  "hl": "id",
+  "page": 90
+})
+headers = {
+  'X-API-KEY': '70e8da0981a132ba7e597d95390996a8b6e3a5c1',
+  'Content-Type': 'application/json'
+}
+
+response = requests.request("POST", url, headers=headers, data=payload)
+
+print(response.text)
