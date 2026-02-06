@@ -114,6 +114,22 @@ pip install -r requirements.txt
 ## Environment Variables
 - `API_KEY`: Serper API key used in `collect.ipynb` for News + Scrape endpoints (set in `.env` or environment).
 
+
+## Sample App (API + UI)
+A simple Flask demo lives in `sample_app/`.
+
+Run it:
+```bash
+cd sample_app
+python app.py
+```
+Then open `http://localhost:8000`.
+
+Environment (optional):
+- `MODEL_PATH`: path to `sentiment_model_final.pkl`
+- `VECTORIZER_PATH`: path to `tfidf_vectorizer.pkl`
+- `PORT`: server port (default 8000)
+
 ## Notes & Warnings
 - `collect.ipynb` reads the API key from environment variable `API_KEY`.
 - Large datasets/models are excluded from git; recreate them by running the notebooks.
