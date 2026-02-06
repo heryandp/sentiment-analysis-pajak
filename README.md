@@ -125,9 +125,13 @@ python app.py
 ```
 Then open `http://localhost:8000`.
 
+
 Environment (optional):
 - `MODEL_PATH`: path to `sentiment_model_final.pkl`
 - `VECTORIZER_PATH`: path to `tfidf_vectorizer.pkl`
+- `EVAL_DATA_PATH`: CSV for evaluation report (default `testing_manual_results.csv`)
+- `EVAL_TEXT_COL`: text column in eval CSV (default `processed_full_content`)
+- `EVAL_LABEL_COL`: label column in eval CSV (default `label_manual`)
 - `PORT`: server port (default 8000)
 
 ## Notes & Warnings

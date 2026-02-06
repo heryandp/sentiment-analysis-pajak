@@ -11,22 +11,36 @@ try:
     import joblib
 except Exception:  # pragma: no cover
     joblib = None  # type: ignore
+try:
+    import pandas as pd
+except Exception:  # pragma: no cover
+    pd = None  # type: ignore
+try:
+    from sklearn.metrics import classification_report
+except Exception:  # pragma: no cover
+    classification_report = None  # type: ignore
 
 APP_DIR = Path(__file__).resolve().parent
 ROOT_DIR = APP_DIR.parent
 
 MODEL_PATH = Path(os.environ.get("MODEL_PATH", ROOT_DIR / "sentiment_model_final.pkl"))
 VECTORIZER_PATH = Path(os.environ.get("VECTORIZER_PATH", ROOT_DIR / "tfidf_vectorizer.pkl"))
+EVAL_DATA_PATH = Path(
+    os.environ.get("EVAL_DATA_PATH", ROOT_DIR / "testing_manual_results.csv")
+)
+EVAL_TEXT_COL = os.environ.get("EVAL_TEXT_COL", "processed_full_content")
+EVAL_LABEL_COL = os.environ.get("EVAL_LABEL_COL", "label_manual")
 
 app = Flask(__name__)
 
 MODEL = None
 VECTORIZER = None
 MODEL_ERROR = None
+EVAL_REPORT = None
 
 
 def _load_assets() -> None:
-    global MODEL, VECTORIZER, MODEL_ERROR
+    global MODEL, VECTORIZER, MODEL_ERROR, EVAL_REPORT
     if joblib is None:
         MODEL_ERROR = "joblib is not installed. Install dependencies first."
         return
@@ -38,6 +52,25 @@ def _load_assets() -> None:
         MODEL = None
         VECTORIZER = None
         MODEL_ERROR = f"Failed to load model assets: {exc}"
+        return
+
+    # Optional evaluation report if data is available
+    EVAL_REPORT = None
+    if pd is None or classification_report is None:
+        return
+    if not EVAL_DATA_PATH.exists():
+        return
+    try:
+        df = pd.read_csv(EVAL_DATA_PATH)
+        if EVAL_TEXT_COL not in df.columns or EVAL_LABEL_COL not in df.columns:
+            return
+        texts = df[EVAL_TEXT_COL].fillna("").astype(str).tolist()
+        labels = df[EVAL_LABEL_COL].fillna("").astype(str).tolist()
+        X_eval = VECTORIZER.transform(texts)
+        preds = MODEL.predict(X_eval)
+        EVAL_REPORT = classification_report(labels, preds, output_dict=True)
+    except Exception:
+        EVAL_REPORT = None
 
 
 def _basic_preprocess(text: str) -> str:
@@ -242,6 +275,8 @@ def health() -> Any:
             "ok": MODEL is not None and VECTORIZER is not None,
             "model_path": str(MODEL_PATH),
             "vectorizer_path": str(VECTORIZER_PATH),
+            "eval_data_path": str(EVAL_DATA_PATH),
+            "eval_report_available": EVAL_REPORT is not None,
             "error": MODEL_ERROR,
         }
     )
@@ -257,6 +292,8 @@ def predict() -> Any:
         return jsonify({"error": "Text is required"}), 400
     try:
         result = _predict(text)
+        if EVAL_REPORT is not None:
+            result["debug"]["evaluation_report"] = EVAL_REPORT
         return jsonify(result)
     except Exception as exc:
         return jsonify({"error": str(exc)}), 500
